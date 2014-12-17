@@ -22,11 +22,11 @@ o.toString()+"());"+a;try{return new Function(b.varname,a)}catch(n){typeof conso
 
 
 var TOKEN_API = doT.template('http://api.twitch.tv/api/channels/{{=it}}/access_token')
-  , USHER_API = doT.template('http://usher.twitch.tv/select/{{=it.channel}}.json?nauthsig={{=it.sig}}&nauth={{=it.token}}&allow_source=true')
+  , USHER_API = doT.template('http://usher.justin.tv/api/channel/hls/{{=it.channel}}.m3u8?token={{=it.token}}&sig={{=it.sig}}')
   , EMBED = doT.template(
               '<div id="vlc" style="width: 100%; height: 100%;"></div>'
             + '<div style="margin-top: 7px;">'
-            +   '<input type="text" id="stream-url" class="text fademe" readonly style="height: 16px;" onClick="this.select();" value="{source}" />'
+            +   '<input type="text" id="stream-url" class="text fademe" readonly style="height: 26px;" onClick="this.select();" value="{source}" />'
             +   '<select id="quality-selector" style="height: 26px; float: right;">'
             +     '{{ for (var prop in it) { if (it.hasOwnProperty(prop)) }}<option value="{{=it[prop]}}">{{=prop}}</option>{{ } }}'
             +   '</select>'
