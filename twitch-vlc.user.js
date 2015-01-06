@@ -5,6 +5,7 @@
 // @description Replace standard flash player with VLC
 // @author      DeniSix
 // @contributor Loomies
+// @downloadURL https://raw.githubusercontent.com/DeniSix/twitch-vlc-userscript/master/twitch-vlc.user.js
 // @include     http://www.twitch.tv/*
 // @match       http://www.twitch.tv/*
 // @grant       GM_xmlhttpRequest
