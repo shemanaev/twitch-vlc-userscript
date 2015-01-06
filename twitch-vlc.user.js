@@ -1,15 +1,16 @@
 // ==UserScript==
 // @name        Twitch.tv in VLC
 // @namespace   http://shemanaev.com
-// @version     1.0
+// @version     1.2
 // @description Replace standard flash player with VLC
+// @author      DeniSix
+// @contributor Loomies
 // @include     http://www.twitch.tv/*
 // @match       http://www.twitch.tv/*
 // @grant       GM_xmlhttpRequest
+// @grant       GM_getValue
+// @grant       GM_setValue
 // ==/UserScript==
-
-/* https://gist.github.com/raw/2625891/waitForKeyElements.js */
-function waitForKeyElements(b,a,h,g){var d,f;if(typeof g=="undefined"){d=$(b)}else{d=$(g).contents().find(b)}if(d&&d.length>0){f=true;d.each(function(){var k=$(this);var l=k.data("alreadyFound")||false;if(!l){var j=a(k);if(j){f=false}else{k.data("alreadyFound",true)}}})}else{f=false}var c=waitForKeyElements.controlObj||{};var i=b.replace(/[^\w]/g,"_");var e=c[i];if(f&&h&&e){clearInterval(e);delete c[i]}else{if(!e){e=setInterval(function(){waitForKeyElements(b,a,h,g)},300);c[i]=e}}waitForKeyElements.controlObj=c};
 
 /* Laura Doktorova https://github.com/olado/doT */
 (function(){function o(){var a={"&":"&#38;","<":"&#60;",">":"&#62;",'"':"&#34;","'":"&#39;","/":"&#47;"},b=/&(?!#?\w+;)|<|>|"|'|\//g;return function(){return this?this.replace(b,function(c){return a[c]||c}):this}}function p(a,b,c){return(typeof b==="string"?b:b.toString()).replace(a.define||i,function(l,e,f,g){if(e.indexOf("def.")===0)e=e.substring(4);if(!(e in c))if(f===":"){a.defineParams&&g.replace(a.defineParams,function(n,h,d){c[e]={arg:h,text:d}});e in c||(c[e]=g)}else(new Function("def","def['"+
@@ -22,17 +23,27 @@ o.toString()+"());"+a;try{return new Function(b.varname,a)}catch(n){typeof conso
 
 
 var TOKEN_API = doT.template('http://api.twitch.tv/api/channels/{{=it}}/access_token')
-  , USHER_API = doT.template('http://usher.justin.tv/api/channel/hls/{{=it.channel}}.m3u8?token={{=it.token}}&sig={{=it.sig}}')
+  , USHER_API = doT.template('http://usher.twitch.tv/api/channel/hls/{{=it.channel}}.m3u8?token={{=it.token}}&sig={{=it.sig}}&allow_source=true&type=any&private_code=&allow_audio_only=true')
+  , VLC_OPTIONS = ':network-caching='
+  , OPTIONS_CACHE = 'network-cache'
   , EMBED = doT.template(
-              '<div id="vlc" style="width: 100%; height: 100%;"></div>'
-            + '<div style="margin-top: 7px;">'
-            +   '<input type="text" id="stream-url" class="text fademe" readonly style="height: 26px;" onClick="this.select();" value="{source}" />'
-            +   '<select id="quality-selector" style="height: 26px; float: right;">'
+              '<embed type="application/x-vlc-plugin" pluginspage="http://www.videolan.org" width="100%" height="100%" id="vlc"></embed>'
+            + '<div style="margin-top: 2px;">'
+            +   '<input type="text" id="stream-url" class="text fademe" readonly style="height: 26px;" onClick="this.select();" value="{source}" title="URL for standalone players" />'
+            +   '<select id="quality-selector" style="height: 26px; float: right;" title="Quality">'
             +     '{{ for (var prop in it) { if (it.hasOwnProperty(prop)) }}<option value="{{=it[prop]}}">{{=prop}}</option>{{ } }}'
             +   '</select>'
+            +   '<input type="text" id="vlc-cache" class="text fademe" style="height: 26px; width: 50px; float: right; margin-right: 7px;" onClick="this.select();" value="' + GM_getValue(OPTIONS_CACHE, 2500) + '" title="Network cache (ms)" />'
             + '</div>'
             )
-  , VLC = doT.template('<embed type="application/x-vlc-plugin" pluginspage="http://www.videolan.org" width="100%" height="100%" src="{{=it}}"></embed>')
+
+function waitForElement(selector, callback) {
+  if (document.querySelector(selector)) {
+    return callback()
+  } else {
+    setTimeout(waitForElement.bind(this, selector, callback), 300)
+  }
+}
 
 function fireOnChange(element) {
   var evt = document.createEvent('HTMLEvents')
@@ -48,6 +59,7 @@ function vlcInit() {
     , $qualitySelector
     , $vlc
     , $streamUrl
+    , $cacheOption
 
   function onPlaylist(response) {
     var urlsRegEx = /https?:\/\/.*fmt=([a-z]+).*/gi
@@ -64,14 +76,30 @@ function vlcInit() {
     $vlc = document.querySelector('#vlc')
     $streamUrl = document.querySelector('#stream-url')
     $qualitySelector = document.querySelector('#quality-selector')
+    $cacheOption = document.querySelector('#vlc-cache')
 
     function qualitySelected() {
       var url = this.value
 
-      $vlc.innerHTML = VLC(url)
+      $vlc.playlist.clear()
+      $vlc.playlist.add(url, url, VLC_OPTIONS + GM_getValue(OPTIONS_CACHE, 2500))
+      $vlc.playlist.play()
       $streamUrl.value = url
     }
 
+    function cacheChanged() {
+      var cache = this.value.trim()
+
+      if (!/^\d+$/.test(cache)) {
+        this.value = GM_getValue(OPTIONS_CACHE, 2500)
+        return
+      }
+
+      GM_setValue(OPTIONS_CACHE, cache)
+      fireOnChange($qualitySelector)
+    }
+
+    $cacheOption.addEventListener('change', cacheChanged, false)
     $qualitySelector.addEventListener('change', qualitySelected, false)
     fireOnChange($qualitySelector)
   }
@@ -95,4 +123,28 @@ function vlcInit() {
   )
 }
 
-waitForKeyElements('#player', vlcInit)
+// Hack for 'ajaxy' Twitch nature
+(function(history){
+  var pushState = history.pushState
+  history.pushState = function(state) {
+    if (typeof history.onpushstate === 'function') {
+      history.onpushstate(state)
+    }
+    return pushState.apply(history, arguments)
+  }
+})(window.history)
+
+history.onpushstate = function (state) {
+  waitForElement('#player', vlcInit)
+}
+
+window.addEventListener('load', function() {
+  // Hack for Chrome. It fires initial `popstate` on page load
+  setTimeout(function() {
+    // 'Back' button listener
+    window.addEventListener('popstate', function(event) {
+      waitForElement('#player', vlcInit)
+    })
+  }, 0)
+  waitForElement('#player', vlcInit)
+})
