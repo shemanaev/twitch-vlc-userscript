@@ -139,13 +139,8 @@ history.onpushstate = function (state) {
   waitForElement('#player', vlcInit)
 }
 
-window.addEventListener('load', function() {
-  // Hack for Chrome. It fires initial `popstate` on page load
-  setTimeout(function() {
-    // 'Back' button listener
-    window.addEventListener('popstate', function(event) {
-      waitForElement('#player', vlcInit)
-    })
-  }, 0)
+window.addEventListener('popstate', function(event) {
   waitForElement('#player', vlcInit)
 })
+
+waitForElement('#player', vlcInit)
